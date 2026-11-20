@@ -20,6 +20,26 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// รองรับการส่งข้อมูลจากหน้าเว็บที่โฮสต์บน Vercel
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      throw new Error('ไม่พบข้อมูลที่ส่งมา');
+    }
+
+    var obj = JSON.parse(e.postData.contents);
+    var result = saveData(obj);
+
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // ฟังก์ชันสำหรับค้นหาหรือสร้างโฟลเดอร์
 function getOrCreateFolder(folderName) {
   var folders = DriveApp.getFoldersByName(folderName);
@@ -39,11 +59,12 @@ function saveData(obj) {
       // เรียกใช้ฟังก์ชันค้นหาหรือสร้างโฟลเดอร์
       var folder = getOrCreateFolder(MAIN_FOLDER_NAME);
       
-      var contentType = obj.imageFile.type;
+      var contentType = obj.imageFile.type || 'image/jpeg';
       var bytes = Utilities.base64Decode(obj.imageFile.data);
       
       // สามารถตั้งชื่อไฟล์รูปใหม่ให้มีวันที่หรือ Serial Number กำกับได้ (ตัวอย่างนี้ใช้ชื่อเดิมที่อัปโหลดมา)
-      var blob = Utilities.newBlob(bytes, contentType, obj.imageFile.name);
+      var fileName = obj.imageFile.name || ('repair_' + new Date().getTime() + '.jpg');
+      var blob = Utilities.newBlob(bytes, contentType, fileName);
       
       var file = folder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -54,19 +75,19 @@ function saveData(obj) {
     
     // จัดเรียงข้อมูลตามคอลัมน์ที่กำหนด
     var rowData = [
-      obj.hospital,       // A: Hospital
-      obj.contactName,    // B: Contact Name
-      obj.contactPhone,   // C: Contact Phone
-      obj.equipment,      // D: Equipment (ชื่อรุ่น)
-      obj.problem,        // E: Problem (อาการเสีย)
-      imageUrl,           // F: Image URL
-      "",                 // G: (เว้นว่าง)
-      "",                 // H: (เว้นว่าง)
-      obj.reportDate,     // I: Report Date
-      obj.engineer,       // J: Engineer
-      obj.serialNumber,   // K: Serial Number
-      obj.ibdate,         // L: IB Date
-      obj.expirydate      // M: Expiry Date
+      obj.hospital || "",       // A: Hospital
+      obj.contactName || "",    // B: Contact Name
+      obj.contactPhone || "",   // C: Contact Phone
+      obj.equipment || "",      // D: Equipment (ชื่อรุ่น)
+      obj.problem || "",        // E: Problem (อาการเสีย)
+      imageUrl,                 // F: Image URL
+      "",                       // G: (เว้นว่าง)
+      "",                       // H: (เว้นว่าง)
+      obj.reportDate || "",     // I: Report Date
+      obj.engineer || "",       // J: Engineer
+      obj.serialNumber || "",   // K: Serial Number
+      obj.ibdate || "",         // L: IB Date
+      obj.expirydate || ""      // M: Expiry Date
     ];
     
     sheet.appendRow(rowData);
@@ -87,13 +108,13 @@ function sendLineOAMessage(obj, imageUrl) {
   if (!LINE_CHANNEL_ACCESS_TOKEN || !LINE_GROUP_ID) return;
 
   var messageText = "📢 แจ้งซ่อมใหม่ (Smart Service)\n" +
-                    "🏥 โรงพยาบาล: " + obj.hospital + "\n" +
-                    "👤 ผู้แจ้ง: " + obj.contactName + "\n" +
-                    "📞 เบอร์โทร: " + obj.contactPhone + "\n" +
-                    "🛠 อุปกรณ์/รุ่น: " + obj.equipment + "\n" +
-                    "🔢 Serial Number: " + obj.serialNumber + "\n" +
-                    "⚠️ อาการเสีย: " + obj.problem + "\n" +
-                    "📅 วันที่แจ้ง: " + obj.reportDate + "\n" +
+                    "🏥 โรงพยาบาล: " + (obj.hospital || "-") + "\n" +
+                    "👤 ผู้แจ้ง: " + (obj.contactName || "-") + "\n" +
+                    "📞 เบอร์โทร: " + (obj.contactPhone || "-") + "\n" +
+                    "🛠 อุปกรณ์/รุ่น: " + (obj.equipment || "-") + "\n" +
+                    "🔢 Serial Number: " + (obj.serialNumber || "-") + "\n" +
+                    "⚠️ อาการเสีย: " + (obj.problem || "-") + "\n" +
+                    "📅 วันที่แจ้ง: " + (obj.reportDate || "-") + "\n" +
                     "👨‍🔧 วิศวกรรับผิดชอบ: " + (obj.engineer ? obj.engineer : "-") + "\n" +
                     "🖼 ดูรูปภาพ: " + imageUrl;
   
@@ -127,13 +148,13 @@ function sendTelegramNotification(obj, imageUrl) {
 
   // จัดข้อความ Telegram (ใช้ <b> เพื่อทำตัวหนา)
   var messageText = "📢 <b>แจ้งซ่อมใหม่ (Smart Service)</b>\n" +
-                    "🏥 <b>โรงพยาบาล:</b> " + obj.hospital + "\n" +
-                    "👤 <b>ผู้แจ้ง:</b> " + obj.contactName + "\n" +
-                    "📞 <b>เบอร์โทร:</b> " + obj.contactPhone + "\n" +
-                    "🛠 <b>อุปกรณ์/รุ่น:</b> " + obj.equipment + "\n" +
-                    "🔢 <b>Serial Number:</b> " + obj.serialNumber + "\n" +
-                    "⚠️ <b>อาการเสีย:</b> " + obj.problem + "\n" +
-                    "📅 <b>วันที่แจ้ง:</b> " + obj.reportDate + "\n" +
+                    "🏥 <b>โรงพยาบาล:</b> " + (obj.hospital || "-") + "\n" +
+                    "👤 <b>ผู้แจ้ง:</b> " + (obj.contactName || "-") + "\n" +
+                    "📞 <b>เบอร์โทร:</b> " + (obj.contactPhone || "-") + "\n" +
+                    "🛠 <b>อุปกรณ์/รุ่น:</b> " + (obj.equipment || "-") + "\n" +
+                    "🔢 <b>Serial Number:</b> " + (obj.serialNumber || "-") + "\n" +
+                    "⚠️ <b>อาการเสีย:</b> " + (obj.problem || "-") + "\n" +
+                    "📅 <b>วันที่แจ้ง:</b> " + (obj.reportDate || "-") + "\n" +
                     "👨‍🔧 <b>วิศวกรรับผิดชอบ:</b> " + (obj.engineer ? obj.engineer : "-") + "\n" +
                     "🖼 <a href='" + imageUrl + "'>ดูรูปภาพประกอบคลิก</a>";
 
