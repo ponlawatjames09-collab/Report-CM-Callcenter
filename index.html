@@ -322,7 +322,7 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>กำลังส่งข้อมูล...</span>';
       statusBox.className = 'status';
-      statusBox.style.display = 'none';
+      statusBox.textContent = '';
 
       try {
         const fileInput = document.getElementById('imageFile');
@@ -351,7 +351,13 @@
           body: JSON.stringify(payload)
         });
 
-        const result = await response.json();
+        const rawText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch {
+          throw new Error('เซิร์ฟเวอร์ปลายทางตอบกลับไม่ถูกต้อง กรุณาตรวจสอบสิทธิ์การเผยแพร่ Google Apps Script');
+        }
         if (result.status === 'success') {
           statusBox.textContent = result.message || 'บันทึกข้อมูลและแจ้งเตือนเรียบร้อยแล้ว';
           statusBox.className = 'status success';
