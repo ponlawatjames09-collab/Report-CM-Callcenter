@@ -1,0 +1,5 @@
+{
+  "name": "Smart Service - ระบบแจ้งซ่อมออนไลน์",
+  "description": "ระบบแจ้งซ่อมออนไลน์สำหรับแจ้งปัญหาอุปกรณ์ทางการแพทย์และส่งแจ้งเตือนไปยัง Google Apps Script",
+  "requestFramePermissions": []
+}
